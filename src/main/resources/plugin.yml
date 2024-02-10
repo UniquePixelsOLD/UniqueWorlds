@@ -1,0 +1,7 @@
+name: $name
+version: $version
+main: net.uniquepixels.game.template.GameTemplate
+description: $description
+depend: [ PaperCore ]
+author: DasShorty
+api-version: "$apiVersion"
