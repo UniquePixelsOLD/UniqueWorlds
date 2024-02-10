@@ -1,7 +1,12 @@
 name: $name
 version: $version
-main: net.uniquepixels.game.template.GameTemplate
+main: net.uniquepixels.uniqueworlds.UniqueWorlds
 description: $description
 depend: [ PaperCore ]
 author: DasShorty
+libraries:
+  - dev.s7a:base64-itemstack:1.0.0
 api-version: "$apiVersion"
+commands:
+  world:
+    aliases: [ worlds ]
