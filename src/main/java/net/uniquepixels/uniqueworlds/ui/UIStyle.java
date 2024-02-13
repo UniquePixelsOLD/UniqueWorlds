@@ -27,6 +27,11 @@ public class UIStyle {
       .color(NamedTextColor.BLUE).style(builder -> builder.decoration(TextDecoration.ITALIC, false).build());
   }
 
+  public static Component middleClick(Locale locale) {
+    return GlobalTranslator.render(Component.translatable("action.middle.click"), locale)
+      .color(NamedTextColor.BLUE).style(builder -> builder.decoration(TextDecoration.ITALIC, false).build());
+  }
+
   public static Component translate(Locale locale, String key, Supplier<ComponentLike> args) {
     return GlobalTranslator.render(Component.translatable(key).arguments(args.get()), locale);
   }

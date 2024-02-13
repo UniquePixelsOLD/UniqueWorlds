@@ -2,8 +2,12 @@ package net.uniquepixels.uniqueworlds.ui.impl;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import net.kyori.adventure.translation.GlobalTranslator;
+import net.uniquepixels.core.paper.chat.chatinput.ChatInput;
 import net.uniquepixels.core.paper.gui.UIRow;
 import net.uniquepixels.core.paper.gui.UISlot;
+import net.uniquepixels.core.paper.gui.backend.UIHolder;
 import net.uniquepixels.core.paper.gui.background.UIBackground;
 import net.uniquepixels.core.paper.gui.exception.OutOfInventoryException;
 import net.uniquepixels.core.paper.gui.item.UIItem;
@@ -12,6 +16,7 @@ import net.uniquepixels.core.paper.item.DefaultItemStackBuilder;
 import net.uniquepixels.uniqueworlds.UniqueWorlds;
 import net.uniquepixels.uniqueworlds.ui.UIHeads;
 import net.uniquepixels.uniqueworlds.ui.UIStyle;
+import net.uniquepixels.uniqueworlds.ui.impl.createworld.CreateWorldUI;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemFlag;
@@ -19,6 +24,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.File;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -26,13 +32,15 @@ import java.util.UUID;
 public class ListWorldsUI extends ChestUI {
 
   private final NamespacedKey worldId = new NamespacedKey(JavaPlugin.getPlugin(UniqueWorlds.class), "world-id");
+  private final UIHolder uiHolder;
   private boolean removeWorlds = false;
 
-  public ListWorldsUI() {
+  public ListWorldsUI(UIHolder uiHolder) {
     super(Component.translatable("ui.world.title").color(UIStyle.DEFAULT_COLOR), UIRow.CHEST_ROW_6);
+    this.uiHolder = uiHolder;
   }
 
-  private ItemStack getItemForWorld(World world, Component title) {
+  private ItemStack getItemForWorld(World world, Component title, Locale locale) {
 
     DefaultItemStackBuilder<?> itemStack = new DefaultItemStackBuilder<>(Material.PAPER);
 
@@ -43,11 +51,36 @@ public class ListWorldsUI extends ChestUI {
       case CUSTOM -> itemStack = new DefaultItemStackBuilder<>(Material.DIRT_PATH);
     }
 
+    if (this.removeWorlds)
+      return itemStack
+        .displayName(title.color(NamedTextColor.GRAY))
+        .addData(this.worldId, PersistentDataType.STRING, world.getUID().toString())
+        .addLoreLine(
+          UIStyle.leftClick(locale).append(UIStyle.MINUS.append(GlobalTranslator.render(Component.translatable("ui.world.entry.delete").color(NamedTextColor.RED), locale)))
+        )
+        .applyItemMeta()
+        .buildItem();
+
     return itemStack
-      .displayName(title)
+      .displayName(title.color(NamedTextColor.GRAY))
       .addData(this.worldId, PersistentDataType.STRING, world.getUID().toString())
+      .addLoreLine(
+        UIStyle.leftClick(locale).append(UIStyle.MINUS.append(GlobalTranslator.render(Component.translatable("ui.world.entry.lore1").color(NamedTextColor.GRAY), locale)))
+      )
+      .addLoreLine(
+        UIStyle.rightClick(locale).append(UIStyle.MINUS.append(GlobalTranslator.render(Component.translatable("ui.world.entry.lore2").color(NamedTextColor.GRAY), locale)))
+      )
+      .addLoreLine(
+        UIStyle.middleClick(locale).append(UIStyle.MINUS.append(GlobalTranslator.render(Component.translatable("ui.world.entry.lore3").color(NamedTextColor.GRAY), locale)))
+      )
       .applyItemMeta()
       .buildItem();
+  }
+
+  private void openInventorySync(Player player) {
+    Bukkit.getScheduler().getMainThreadExecutor(JavaPlugin.getPlugin(UniqueWorlds.class)).execute(() -> {
+      this.uiHolder.open(new ListWorldsUI(this.uiHolder), player);
+    });
   }
 
   @Override
@@ -59,12 +92,42 @@ public class ListWorldsUI extends ChestUI {
 
       World world = Bukkit.getWorlds().get(slot);
 
-      item(new UIItem(this.getItemForWorld(world, Component.text(world.getName())), UISlot.fromSlotId(slot).orElse(UISlot.SLOT_0)),
+      item(new UIItem(this.getItemForWorld(world, Component.text(world.getName()), player.locale()), UISlot.fromSlotId(slot).orElse(UISlot.SLOT_0)),
         (player1, uiItem, clickType, inventoryClickEvent) -> {
 
           String rawWorldId = new DefaultItemStackBuilder<>(uiItem.getItemStack()).getData(this.worldId, PersistentDataType.STRING);
 
           World clickedWorld = Bukkit.getWorld(UUID.fromString(rawWorldId));
+
+          if (clickedWorld == null) {
+            player1.sendMessage(UIStyle.PREFIX.append(Component.translatable("ui.world.notfound").color(NamedTextColor.RED)));
+            player1.playSound(player1.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 30f, 1f);
+            return true;
+          }
+
+          if (this.removeWorlds && clickType.isLeftClick()) {
+
+            if (Bukkit.getWorlds().size() == 1) {
+              player1.playSound(player1.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 30f, 1f);
+              return true;
+            }
+
+            player1.closeInventory();
+            player1.sendMessage(UIStyle.PREFIX.append(
+              Component.translatable("message.delete.world").arguments(Component.text(clickedWorld.getName())).color(NamedTextColor.GRAY)
+                .append(Component.space().append(Component.translatable("message.delete.world.plus").color(NamedTextColor.GREEN)))
+            ));
+
+            Bukkit.unloadWorld(clickedWorld, true);
+
+            Bukkit.getScheduler().runTaskAsynchronously(JavaPlugin.getPlugin(UniqueWorlds.class), () -> {
+              File worldContainer = Bukkit.getWorldContainer();
+              new File(worldContainer, world.getName()).delete();
+
+              this.openInventorySync(player1);
+            });
+            return true;
+          }
 
           switch (clickType) {
             case LEFT -> {
@@ -72,10 +135,15 @@ public class ListWorldsUI extends ChestUI {
               Location loc = new Location(clickedWorld, player1.getX(), player1.getY(), player1.getZ());
               player1.teleportAsync(loc);
               player1.playSound(loc, Sound.ENTITY_ENDER_PEARL_THROW, 30f, 1f);
-              player1.sendMessage(UIStyle.PREFIX.append(Component.text("teleported!")));
+              player1.sendMessage(UIStyle.PREFIX.append(Component.text("teleported!").color(NamedTextColor.GRAY)));
             }
-            case RIGHT -> {
-
+            case RIGHT -> this.uiHolder.open(new SpecificWorldInfoUI(clickedWorld, this.uiHolder), player1);
+            case MIDDLE -> {
+              player1.closeInventory();
+              Location loc = clickedWorld.getSpawnLocation();
+              player1.teleportAsync(loc);
+              player1.playSound(loc, Sound.ENTITY_ENDER_PEARL_THROW, 30f, 1f);
+              player1.sendMessage(UIStyle.PREFIX.append(Component.text("teleported!").color(NamedTextColor.GRAY)));
             }
           }
 
@@ -97,6 +165,16 @@ public class ListWorldsUI extends ChestUI {
           .buildItem(), UISlot.SLOT_45),
       (player1, uiItem, clickType, inventoryClickEvent) -> {
 
+      player1.closeInventory();
+
+      JavaPlugin.getPlugin(UniqueWorlds.class).getChatInputManager().addChatInput(new ChatInput(player1, component -> {
+        String userInput = PlainTextComponentSerializer.plainText().serialize(component);
+
+        Bukkit.getScheduler().getMainThreadExecutor(JavaPlugin.getPlugin(UniqueWorlds.class)).execute(() -> {
+          this.uiHolder.open(new CreateWorldUI(userInput, this.uiHolder), player1);
+        });
+
+      }));
 
         return true;
       });
@@ -117,9 +195,13 @@ public class ListWorldsUI extends ChestUI {
           .applyItemMeta()
           .buildItem(), UISlot.SLOT_46),
       (player1, uiItem, clickType, inventoryClickEvent) -> {
-
-        player1.sendMessage("not impl yet!");
-
+        this.removeWorlds = !removeWorlds;
+        player1.playSound(player1.getLocation(), Sound.BLOCK_NOTE_BLOCK_BIT, 30f, 1f);
+        try {
+          this.refreshInventory(player1);
+        } catch (OutOfInventoryException e) {
+          throw new RuntimeException(e);
+        }
         return true;
       });
 

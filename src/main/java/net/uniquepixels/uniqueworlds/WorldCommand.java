@@ -30,7 +30,7 @@ public class WorldCommand implements CommandExecutor {
     if (!(sender instanceof Player player))
       return true;
 
-    this.uiHolder.open(new ListWorldsUI(), player);
+    this.uiHolder.open(new ListWorldsUI(this.uiHolder), player);
 
     return true;
   }
