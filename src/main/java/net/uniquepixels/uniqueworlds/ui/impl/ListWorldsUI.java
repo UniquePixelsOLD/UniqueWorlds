@@ -120,9 +120,12 @@ public class ListWorldsUI extends ChestUI {
 
             Bukkit.unloadWorld(clickedWorld, true);
 
+            JavaPlugin.getPlugin(UniqueWorlds.class).getConfigWorld().removeWorld(clickedWorld);
+
             Bukkit.getScheduler().runTaskAsynchronously(JavaPlugin.getPlugin(UniqueWorlds.class), () -> {
               File worldContainer = Bukkit.getWorldContainer();
               new File(worldContainer, world.getName()).delete();
+
 
               this.openInventorySync(player1);
             });

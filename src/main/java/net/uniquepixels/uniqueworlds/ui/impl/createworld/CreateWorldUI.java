@@ -226,7 +226,13 @@ public class CreateWorldUI extends ChestUI {
         }
 
         World world = worldCreator.createWorld();
-        world.save();
+
+        if (world == null)
+          return true;
+
+        world.setSpawnLocation(0, 1, 0);
+
+        JavaPlugin.getPlugin(UniqueWorlds.class).getConfigWorld().saveWorld(world, this.worldOptions);
 
         return true;
       }

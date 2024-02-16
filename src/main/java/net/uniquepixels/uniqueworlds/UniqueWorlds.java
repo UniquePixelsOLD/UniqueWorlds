@@ -5,22 +5,23 @@ import net.kyori.adventure.translation.GlobalTranslator;
 import net.kyori.adventure.translation.TranslationRegistry;
 import net.uniquepixels.core.paper.chat.chatinput.ChatInputManager;
 import net.uniquepixels.core.paper.gui.backend.UIHolder;
+import net.uniquepixels.uniqueworlds.ui.impl.createworld.CreateWorldOptions;
 import org.bukkit.Bukkit;
-import org.bukkit.WorldCreator;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.FileVisitOption;
-import java.nio.file.Files;
-import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
 
 public class UniqueWorlds extends JavaPlugin {
 
   private ChatInputManager chatInputManager;
+  private ConfigWorld configWorld;
+
+  public ConfigWorld getConfigWorld() {
+    return configWorld;
+  }
 
   public ChatInputManager getChatInputManager() {
     return chatInputManager;
@@ -33,6 +34,8 @@ public class UniqueWorlds extends JavaPlugin {
     TranslationRegistry registry = TranslationRegistry.create(Key.key("uniqueworlds"));
     registry.registerAll(Locale.ENGLISH, bundle, true);
     GlobalTranslator.translator().addSource(registry);
+
+    this.saveDefaultConfig();
 
     RegisteredServiceProvider<UIHolder> uiProvider = Bukkit.getServicesManager().getRegistration(UIHolder.class);
 
@@ -54,6 +57,8 @@ public class UniqueWorlds extends JavaPlugin {
      * */
     this.chatInputManager = chatProvider.getProvider();
 
+    this.configWorld = new ConfigWorld(this.getConfig());
+
     getCommand("world").setExecutor(new WorldCommand(uiHolder));
 
     this.loadWorlds();
@@ -61,25 +66,14 @@ public class UniqueWorlds extends JavaPlugin {
 
   private void loadWorlds() {
 
-    List<String> exclude = List.of("cache", "config", "libraries", "logs", "plugins", "versions", "data", ".");
+    ConfigurationSection worlds = this.getConfig().getConfigurationSection("worlds");
 
-    File worldContainer = Bukkit.getWorldContainer();
-    try {
-      Files.walk(worldContainer.toPath(), 1, FileVisitOption.FOLLOW_LINKS).filter(path -> path.toFile().isDirectory())
-        .filter(path -> !exclude.contains(path.toFile().getName())).forEach(path -> {
+    if (worlds == null)
+      Bukkit.getWorlds().forEach(world -> this.configWorld.saveWorld(world, CreateWorldOptions.DEFAULT));
 
-          String worldName = path.toFile().getName();
+    for (ConfigWorld.UnloadedWorldData worldData : this.configWorld.loadWorlds())
+      worldData.loadWorld();
 
-          if (Bukkit.getWorld(worldName) == null) {
-
-            WorldCreator.name(worldName).createWorld();
-
-          }
-
-        });
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
 
   }
 
