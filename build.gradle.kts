@@ -9,12 +9,17 @@ version = "1.0.0"
 description = "manage worlds"
 
 java {
-  toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+  toolchain.languageVersion.set(JavaLanguageVersion.of(17))
 }
 
 repositories {
-  mavenLocal()
   mavenCentral()
+  maven("https://repo.uniquepixels.net/repository/minecraft") {
+    credentials {
+      username = "projectwizard"
+      password = System.getenv("UP_NEXUS_PASSWORD")
+    }
+  }
 }
 
 dependencies {
@@ -34,7 +39,7 @@ tasks {
 
   compileJava {
     options.encoding = Charsets.UTF_8.name()
-    options.release.set(21)
+    options.release.set(17)
   }
   javadoc {
     options.encoding = Charsets.UTF_8.name()
@@ -56,6 +61,6 @@ tasks {
   reobfJar {
     // This is an example of how you might change the output location for reobfJar. It's recommended not to do this
     // for a variety of reasons, however it's asked frequently enough that an example of how to do it is included here.
-    outputJar.set(layout.buildDirectory.file("libs/GameTemplate-${project.version}.jar"))
+    outputJar.set(layout.buildDirectory.file("dist/UniqueWorlds-${project.version}.jar"))
   }
 }
