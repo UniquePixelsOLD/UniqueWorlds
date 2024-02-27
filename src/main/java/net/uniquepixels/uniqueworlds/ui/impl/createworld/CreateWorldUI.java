@@ -174,6 +174,8 @@ public class CreateWorldUI extends ChestUI {
         .buildItem(), UISlot.SLOT_12),
       (player1, uiItem, clickType, inventoryClickEvent) -> {
 
+        // TODO - add message for user
+
         JavaPlugin.getPlugin(UniqueWorlds.class).getChatInputManager().addChatInput(new ChatInput(player1, component -> {
 
           String userInput = PlainTextComponentSerializer.plainText().serialize(component);
